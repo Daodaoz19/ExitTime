@@ -13,9 +13,9 @@
 
 using namespace std;
 
-#define DefaultBin 50 //This represent only one side of the total bin
-#define DefaultNumofRun 1e6
-#define DefaultNumofParticle 2
+#define DefaultBin 5//This represent only one side of the total bin
+#define DefaultNumofRun 1e6 
+#define DefaultNumofParticle 15
 // #define printtraj
 // #define DEBUG
 
@@ -60,18 +60,26 @@ int main(int argc, char* argv[]){
     
     double h = L/(BINNUM);  // interval length for the discretization
     double d = 2*D/(h*h); // d is the jumping rate, including jumping to left or right
-   
+    double r = 1; //reaction rate
+
   //*****************************************
   //variables for SSA process
   //*****************************************
+  //change a0 for calculate totala1+total2? 
+  //totala1=numberofpaticle * d
+  //totala2= NUMofParticle * L
   double a0;
-    a0 = NUMofParticle * d; // the total jumping propensity, each particle has the same jumping rate, so the calculation is easy.
+  double totala1;
+  double totala2;
+    totala1 = NUMofParticle * d; //jumping propensity=12000
+    totala2 = r * L;// propensity for reaction A->B=1
+    a0 = totala1+totala2;// total propensity
   double r1, r2, r2residual;
   double tau;
-    int jump_index, jumpdirection;
+  int jump_index, jumpdirection;
  
-    srand(time(NULL));
-    //srand(1.0); 
+   // srand(time(NULL));
+    srand(1.0); 
   
     ofstream exittimefile("exittimefile", ios::out);
     ofstream exitstepfile("exitstep", ios::out);
@@ -86,11 +94,12 @@ int main(int argc, char* argv[]){
     cout << "jumping rate = " << d << endl;
     cout<<"total iterations "<< NUMofRUNS <<endl;
 	 double exittime[NUMofRUNS];
-
+  std::vector<bool> isReacted(NUMofParticle, false);  // Track Reacted particles
   for(int real=0; real< NUMofRUNS; real++){
       
       for (i=0; i < NUMofParticle; i++)
           particlelocation[i] = 0; // reset particle locations. all particles are at location 0
+          isReacted[i] = false;
       nstep = 0;  // reset number of jumping steps
       
       double timeTracker = 0.0; // reset time
@@ -106,20 +115,32 @@ int main(int argc, char* argv[]){
       //***********************************
 
 		  r2 = 1.0*rand()/RAND_MAX;
-		  jump_index = (int) (r2* NUMofParticle); // uniform distribution, select the index for the particle that will jump
-          
-          
-
-      r2residual = r2*NUMofParticle - jump_index; //decide left or right jump
-      if (r2residual > 0.5)
-          jumpdirection = 1;
-      else
-          jumpdirection = -1;
-
-          
+      double r2a0 = r2*a0;
+      double sum_a = totala1;
+      //cout << "totala2: " << totala2 << endl;  
+      //cout << "r2a0: " << r2a0 << endl;  
+      //cout << "sum_a: " << sum_a << endl;  
+      jump_index = (int) (r2* NUMofParticle); // uniform distribution, select the index for the particle that will jump 
+      
+      if(sum_a>r2a0){//Diffusion
+      if (!isReacted[jump_index]) {//Only original particle is able to diffuse
+        r2residual = r2*NUMofParticle - jump_index; //decide left or right jump
+        if (r2residual > 0.5)
+            jumpdirection = 1;
+        else
+            jumpdirection = -1;
+            
       // cout << "one step" << r2residual << "jump" << jumpdirection << endl;
-          
 		  particlelocation[jump_index] += jumpdirection;
+      }
+        
+      }else{//Reaction
+        isReacted[jump_index] = true;
+        //cout << "Particle " << jump_index << " become non-diffusible species " << timeTracker << endl;
+      }
+
+		
+      
           
       // cout << jump_index << "jump to" << particlelocation[jump_index] << endl;
           
@@ -137,8 +158,16 @@ int main(int argc, char* argv[]){
 	double sum = 0;
 	for (i = 0; i < NUMofRUNS; i++) 
 		sum += exittime[i];
+  double mean = sum / NUMofRUNS;
 	cout << "average exiting time = " << sum/NUMofRUNS << endl;
-    cout<<"end of simulation ..."<<endl;
+
+
+  double variance = 0;
+  for (i = 0; i < NUMofRUNS; i++)
+      variance += (exittime[i] - mean) * (exittime[i] - mean);
+  variance /= NUMofRUNS;
+  cout << "Variance of exiting time = " << variance << endl;
+  cout<<"end of simulation ..."<<endl;
 }
 
 double reactiontime(double a0) {
