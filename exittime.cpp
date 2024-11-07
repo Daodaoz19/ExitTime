@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
       int index = (int)(r2 * a_species.size());
       int jump_index = a_species[index]; 
 
-      //when i-th particle diffuse
+      //when jump_index-th particle diffuse
       if (r2a0<d)
       {
        
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
          a_species.erase(a_species.begin() + index);
         }
       }
-      else//when i-th particle diffuse
+      else//when jump_index-th particle react
       {
           a_species.erase(a_species.begin() + index);
           b_species.push_back(jump_index);
