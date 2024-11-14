@@ -16,9 +16,9 @@
 
 using namespace std;
 
-#define DefaultBin 1 // This represent only one side of the total bin
+#define DefaultBin 30// This represent only one side of the total bin
 #define DefaultNumofRun 1
-#define DefaultNumofParticle 15
+#define DefaultNumofParticle 10000
 // #define printtraj
 // #define DEBUG
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
   double tau;
   int jump_index, jumpdirection;
 
-  // srand(time(NULL));
+  srand(time(NULL));
   //srand(1.0);
 
   ofstream exittimefile("exittimefile", ios::out);
@@ -126,12 +126,11 @@ int main(int argc, char *argv[])
 
       int index = (int)(r2 * a_species.size());
       int jump_index = a_species[index]; 
-
       //when jump_index-th particle diffuse
       if (r2a0<d)
       {
        
-        r2residual = r2 * NUMofParticle - jump_index; // decide left or right jump
+        r2residual = r2 * a_species.size() - jump_index; // decide left or right jump
         if (r2residual > 0.5)
           jumpdirection = 1;
         else
