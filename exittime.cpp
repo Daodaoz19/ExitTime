@@ -16,7 +16,7 @@
 
 using namespace std;
 
-#define DefaultBin 30// This represent only one side of the total bin
+#define DefaultBin 1// This represent only one side of the total bin
 #define DefaultNumofRun 1
 #define DefaultNumofParticle 10000
 // #define printtraj
@@ -47,11 +47,9 @@ int main(int argc, char *argv[])
   if (NUMofParticle == 0)
     NUMofParticle = DefaultNumofParticle;
 
- vector<int> a_species(NUMofParticle);
- vector<int> b_species; 
- for (int i = 0; i < NUMofParticle; i++) {
-    a_species[i] = i;
- }
+
+  list<int> a_particles;
+  list<int> b_particles; 
 
   int particlelocation[NUMofParticle];
   int i, j, nstep;
@@ -73,13 +71,14 @@ int main(int argc, char *argv[])
   // variables for SSA process
   //*****************************************
   double a0;
-  a0 = d + r; // total propensityle * d; // the total jumping propensity, each particle has the same jumping rate, so the calculation is easy.
+  // a0 = (d + r)*a_particles.size(); // total propensityle * d; // the total jumping propensity, each particle has the same jumping rate, so the calculation is easy.
+  //a0=d+r;
   double r1, r2, r2residual;
   double tau;
   int jump_index, jumpdirection;
 
-  srand(time(NULL));
-  //srand(1.0);
+  //srand(time(NULL));
+  srand(1.0);
 
   ofstream exittimefile("exittimefile", ios::out);
   ofstream exitstepfile("exitstep", ios::out);
@@ -89,76 +88,64 @@ int main(int argc, char *argv[])
   //************************************************
   cout << "Begin the model simulation ..." << endl;
   cout << "BINNUM = " << BINNUM << endl;
-  cout << "initial number of particles: " << NUMofParticle << endl;
+  //cout << "initial number of particles: " << NUMofParticle << endl;
   cout << "Diffusion rate = " << D << endl;
   cout << "jumping rate = " << d << endl;
   cout << "total iterations " << NUMofRUNS << endl;
   double exittime[NUMofRUNS];
-  cout << "Initial population of a: " << a_species.size() << endl;
-  cout << "Initial population of b: " << b_species.size() << endl;
   for (int real = 0; real < NUMofRUNS; real++)
   {  
-    srand(1.0);
-
-    a_species.clear();
-    b_species.clear();
-    for (int i = 0; i < NUMofParticle; i++) {
-        a_species.push_back(i);
-        particlelocation[i] = 0; // reset particle locations. all particles are at location 0
-    }
-    nstep = 0;                 // reset number of jumping steps
-
-    double timeTracker = 0.0; // reset time
-    bool exitflag = false;    // reset exitflag
-
-    while (!exitflag && !a_species.empty())
-    {
-
-      tau = reactiontime(a0);
-
-      timeTracker += tau;
-      nstep++;
-
-      //***********************************
-
-      r2 = 1.0 * rand() / RAND_MAX;
-      double r2a0 = r2 * a0;
-
-      int index = (int)(r2 * a_species.size());
-      int jump_index = a_species[index]; 
-      //when jump_index-th particle diffuse
-      if (r2a0<d)
-      {
-       
-        r2residual = r2 * a_species.size() - jump_index; // decide left or right jump
-        if (r2residual > 0.5)
-          jumpdirection = 1;
-        else
-          jumpdirection = -1;
-
-        // cout << "one step" << r2residual << "jump" << jumpdirection << endl;
-
-        particlelocation[jump_index] += jumpdirection;
-        if (particlelocation[jump_index] == BINNUM * jumpdirection)
-        {
-         a_species.erase(a_species.begin() + index);
+        
+        a_particles.clear();//Clear previous run's data
+        b_particles.clear();
+        for (int i = 0; i < NUMofParticle; i++) {
+          a_particles.push_back(i); //reset a particle
+          particlelocation[i] = 0; // reset particle locations. all particles are at location 0
         }
-      }
-      else//when jump_index-th particle react
-      {
-          a_species.erase(a_species.begin() + index);
-          b_species.push_back(jump_index);
-      }
-      // cout << jump_index << "jump to" << particlelocation[jump_index] << endl;
+        nstep = 0; // reset number of jumping steps
+        double timeTracker = 0.0; // reset time
+        bool exitflag = false; // reset exitflag
+        cout << "Initial population of a particles: " << a_particles.size() << endl;
+        cout << "Initial population of b particles: " << b_particles.size() << endl;
+        while (!exitflag && !a_particles.empty()) {
 
-      if (a_species.empty())
-      {
-        exitflag = true;
-        exittime[real] = timeTracker;
-        exittimefile << timeTracker << endl;
-        exitstepfile << nstep << endl;
-      }
-    }
+            a0 = (d + r)*a_particles.size(); //the total jumping and reacting propensity
+
+            tau = reactiontime(a0);
+            timeTracker += tau;
+            nstep++;
+
+            r2 = 1.0 * rand() / RAND_MAX;
+            double r2a0 = r2 * a0;
+
+            int index = int(r2* a_particles.size());//select the index for the particle that will jump or react
+            auto it = a_particles.begin();//initialize iterator at the begining of the a_particles list 
+            advance(it, index); // Move iterator point to the selected index
+   
+            if (r2a0 < d) { // Diffusion event
+                r2residual = r2 * a_particles.size() - index; // decide left or right jump
+                if (r2residual > 0.5)
+                    jumpdirection = 1;
+                else
+                    jumpdirection = -1;
+               
+                particlelocation[*it] += jumpdirection;
+                if (particlelocation[*it] == BINNUM * jumpdirection) {
+                    a_particles.erase(it); // Remove particle from a_particles list
+                }
+            } else { // Reaction event
+               
+              a_particles.erase(it);// Remove particle from a_particles list
+              b_particles.push_back(*it); //Add particle to b_particles list
+            } 
+
+            if (a_particles.empty()) {
+                exitflag = true;
+                exittime[real] = timeTracker;
+                exittimefile << timeTracker << endl;
+                exitstepfile << nstep << endl;
+            }
+        }
   }
 
   double sum = 0;
@@ -173,8 +160,8 @@ int main(int argc, char *argv[])
   variance /= NUMofRUNS;
   //cout << "Variance of exiting time = " << variance << endl;
   cout << "end of simulation ..." << endl;
-  cout << "Final number of a: " << a_species.size() << endl;
-  cout << "Final number of b: " << b_species.size() << endl;
+  cout << "final population of a particles: " << a_particles.size()   << endl;
+  cout << "final population of b particles: " << b_particles.size()   << endl;
    
 }
 
