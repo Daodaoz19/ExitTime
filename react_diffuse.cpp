@@ -12,8 +12,8 @@ using namespace std;
 
 #define DefaultBin 1 // This represents only one side of the total bin
 #define DefaultNumofRun 1
-#define DefaultNumofParticleA 5  // initial population of a particles
-#define DefaultNumofParticleB 5  // initial population of b particles
+#define DefaultNumofParticleA 1  // initial population of a particles
+#define DefaultNumofParticleB 1  // initial population of b particles
 // #define printtraj
 // #define DEBUG
 
@@ -66,8 +66,9 @@ int main(int argc, char *argv[])
     double D = 1; // Diffusion rate
 
     double h = L / (BINNUM);    // interval length for the discretization
-    double d = 2 * D / (h * h); // d is the jumping rate, including jumping to left or right
-    double r = 1;               // reaction rate
+    double d =  2* D / (h * h); // d is the jumping rate, including jumping to left or right
+    
+    double r = 1/h;               // reaction rate
 
     //*****************************************
     // variables for SSA process
@@ -89,8 +90,9 @@ int main(int argc, char *argv[])
     //************************************************
     cout << "Begin the model simulation ..." << endl;
     cout << "BINNUM = " << BINNUM << endl;
-    cout << "Diffusion rate = " << D << endl;
+    //cout << "Diffusion rate = " << D << endl;
     cout << "jumping rate = " << d << endl;
+    cout << "reacting rate = " << r << endl;
     cout << "total iterations " << NUMofRUNS << endl;
 
     double exittime[NUMofRUNS];
@@ -123,9 +125,9 @@ int main(int argc, char *argv[])
         nstep = 0; 
         double timeTracker = 0.0; 
         bool exitflag = false; 
-        cout << "Initial population of a particles: " << a_particles.size() << endl;
-        cout << "Initial population of b particles: " << b_particles.size() << endl;
-        cout << "Initial population of c particles: " << c_population << endl;
+        // cout << "Initial population of a particles: " << a_particles.size() << endl;
+        // cout << "Initial population of b particles: " << b_particles.size() << endl;
+        // cout << "Initial population of c particles: " << c_population << endl;
      
         while (!exitflag && (!a_particles.empty() || !b_particles.empty()))
         {   // total propensity = diffusion propensity + reaction propensity
@@ -140,7 +142,7 @@ int main(int argc, char *argv[])
 
             if (r2a0 < d * a_particles.size())// a diffuse
             {
-               
+                printf("a diffuse\n");
                 int index = int(r2 * a_particles.size());
                 auto it = a_particles.begin();
                 advance(it, index);
@@ -156,11 +158,12 @@ int main(int argc, char *argv[])
                 {
                     jumptimesfile << timeTracker << endl; 
                     total_jump_time += timeTracker;
-                    a_particles.erase(it);
+                    //a_particles.erase(it);
                 }
             }
             else if (r2a0 < d * (a_particles.size() + b_particles.size()))// b diffuse
             {
+                printf("b diffuse\n");
                 int index = int(r2 * b_particles.size());
                 auto it = b_particles.begin();
                 advance(it, index);
@@ -176,11 +179,11 @@ int main(int argc, char *argv[])
                 {
                     jumptimesfile << timeTracker << endl; // Record jump time
                     total_jump_time += timeTracker;
-                    b_particles.erase(it);
+                    //b_particles.erase(it);
                 }
             }
             else //reaction: a + b -> c
-            {
+            {   printf("react\n");
                 int a_index = int(r2 * a_particles.size());
                 auto a_it = a_particles.begin();
                 advance(a_it, a_index);
@@ -188,7 +191,7 @@ int main(int argc, char *argv[])
                 int b_index = int(r2 * b_particles.size());
                 auto b_it = b_particles.begin();
                 advance(b_it, b_index);
-
+                //printf("reaction\n");
                 reactiontimefile << timeTracker << endl;
                 total_reaction_time += timeTracker;
                 reaction_count++;
