@@ -203,17 +203,17 @@ int main(int argc, char *argv[])
 
     }
 
-    double sum = 0;
-    for (i = 0; i < NUMofRUNS; i++)
-        sum += exittime[i];
-    double mean = sum / NUMofRUNS;
-    cout << "final exiting time = " << sum / NUMofRUNS << endl;
+    // double sum = 0;
+    // for (i = 0; i < NUMofRUNS; i++)
+    //     sum += exittime[i];
+    // double mean = sum / NUMofRUNS;
+    // cout << "final exiting time = " << sum / NUMofRUNS << endl;
     
     cout << "average reaction time " << total_reaction_time / reaction_count << endl;
-    double variance = 0;
-    for (i = 0; i < NUMofRUNS; i++)
-        variance += (exittime[i] - mean) * (exittime[i] - mean);
-    variance /= NUMofRUNS;
+    // double variance = 0;
+    // for (i = 0; i < NUMofRUNS; i++)
+    //     variance += (exittime[i] - mean) * (exittime[i] - mean);
+    // variance /= NUMofRUNS;
 
 
     cout << "end of simulation ..." << endl;
