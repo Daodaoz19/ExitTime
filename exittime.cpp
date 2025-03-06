@@ -1,8 +1,3 @@
-//**********************************************
-// This piece of code intend to test the exit time for one or multiple particles exit from a 1D domain [-L L]. Here we assume that the particles are located in origin. They can be modelled by jumps in discrete grids or a Gaussian diffusion equation.
-//
-//**********************************************
-
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -10,184 +5,234 @@
 #include <cmath>
 #include <ctime>
 #include <random>
-#include <algorithm>
 #include <list>
 #include <iterator>
 
 using namespace std;
 
-#define DefaultBin 1// This represent only one side of the total bin
-#define DefaultNumofRun 1
-#define DefaultNumofParticle 10000
+#define DefaultBin 5// This represents only one side of the total bin
+#define DefaultNumofRun 10000
+#define DefaultNumofParticleA 1  // initial population of a particles
+#define DefaultNumofParticleB 1  // initial population of b particles
 // #define printtraj
 // #define DEBUG
 
 int main(int argc, char *argv[])
 {
+    int BINNUM, NUMofRUNS, NUMofParticleA, NUMofParticleB;
+    if (argc > 1)
+        BINNUM = atoi(argv[1]);
+    else
+        BINNUM = DefaultBin;
+    if (BINNUM == 0)
+        BINNUM = DefaultBin;
 
-  int BINNUM, NUMofRUNS, NUMofParticle;
-  if (argc > 1)
-    BINNUM = atoi(argv[1]);
-  else
-    BINNUM = DefaultBin;
-  if (BINNUM == 0)
-    BINNUM = DefaultBin;
+    if (argc > 2)
+        NUMofRUNS = atoi(argv[2]);
+    else
+        NUMofRUNS = DefaultNumofRun;
+    if (NUMofRUNS == 0)
+        NUMofRUNS = DefaultNumofRun;
 
-  if (argc > 2)
-    NUMofRUNS = atoi(argv[2]);
-  else
-    NUMofRUNS = DefaultNumofRun;
-  if (NUMofRUNS == 0)
-    NUMofRUNS = DefaultNumofRun;
+    if (argc > 3)
+        NUMofParticleA = atoi(argv[3]);
+    else
+        NUMofParticleA = DefaultNumofParticleA;
+    if (NUMofParticleA == 0)
+        NUMofParticleA = DefaultNumofParticleA;
 
-  if (argc > 3)
-    NUMofParticle = atoi(argv[3]);
-  else
-    NUMofParticle = DefaultNumofParticle;
-  if (NUMofParticle == 0)
-    NUMofParticle = DefaultNumofParticle;
+    if (argc > 4)
+        NUMofParticleB = atoi(argv[4]);
+    else
+        NUMofParticleB = DefaultNumofParticleB;
+    if (NUMofParticleB == 0)
+        NUMofParticleB = DefaultNumofParticleB;
 
+    list<int> a_particles;
+    list<int> b_particles;
 
-  list<int> a_particles;
-  list<int> b_particles; 
+    int particlelocation_a[NUMofParticleA];
+    int particlelocation_b[NUMofParticleB];
+    int i, j, nstep;
 
-  int particlelocation[NUMofParticle];
-  int i, j, nstep;
+    double reactiontime(double);
 
-  double reactiontime(double);
+    ////////////////////////////////////////////////////
+    // Parameter set
+    ////////////////////////////////////////////////////
 
-  ////////////////////////////////////////////////////
-  // Parameter set
-  ////////////////////////////////////////////////////
+    double L = 1; // 1D interval length (half)
 
-  double L = 1; // 1D interval length (half)
+    double D = 1; // Diffusion rate
 
-  double D = 1; // Diffusion rate
+    double h = L / (BINNUM);    // interval length for the discretization
+    double d =  2* D / (h * h); // d is the jumping rate, including jumping to left or right
+    
+    double r = 1;               // reaction rate
 
-  double h = L / (BINNUM);    // interval length for the discretization
-  double d = 2 * D / (h * h); // d is the jumping rate, including jumping to left or right
-  double r = 1;               // reaction rate
-  //*****************************************
-  // variables for SSA process
-  //*****************************************
-  double a0;
-  // a0 = (d + r)*a_particles.size(); // total propensityle * d; // the total jumping propensity, each particle has the same jumping rate, so the calculation is easy.
-  //a0=d+r;
-  double r1, r2, r2residual;
-  double tau;
-  int jump_index, jumpdirection;
+    //*****************************************
+    // variables for SSA process
+    //*****************************************
+    double a0;
+    double r1, r2, r2residual;
+    double tau;
+    int jump_index, jumpdirection;
 
-  //srand(time(NULL));
-  srand(1.0);
+    srand(1.0);
 
-  ofstream exittimefile("exittimefile", ios::out);
-  ofstream exitstepfile("exitstep", ios::out);
+    ofstream exittimefile("exittimefile", ios::out);
+    ofstream reactiontimefile("reactiontimes", ios::out);
+    ofstream jumptimesfile("jumptimes", ios::out);
+    ofstream exitstepfile("exitstep", ios::out);
 
-  //************************************************
-  // Begin simulation, and set up timer
-  //************************************************
-  cout << "Begin the model simulation ..." << endl;
-  cout << "BINNUM = " << BINNUM << endl;
-  //cout << "initial number of particles: " << NUMofParticle << endl;
-  cout << "Diffusion rate = " << D << endl;
-  cout << "jumping rate = " << d << endl;
-  cout << "total iterations " << NUMofRUNS << endl;
-  double exittime[NUMofRUNS];
-  for (int real = 0; real < NUMofRUNS; real++)
-  {  
-        
-        a_particles.clear();//Clear previous run's data
+    //************************************************
+    // Begin simulation, and set up timer
+    //************************************************
+    cout << "Begin the model simulation ..." << endl;
+    cout << "BINNUM = " << BINNUM << endl;
+    //cout << "Diffusion rate = " << D << endl;
+    cout << "jumping rate = " << d << endl;
+    cout << "reacting rate = " << r << endl;
+    cout << "total iterations " << NUMofRUNS << endl;
+
+    double exittime[NUMofRUNS];
+    double total_reaction_time = 0.0;
+    double total_jump_time = 0.0;
+    int reaction_count = 0;
+    int jump_count = 0;
+    int c_population = 0; // Population of c particles
+
+    for (int real = 0; real < NUMofRUNS; real++)
+    {
+        a_particles.clear(); // Clear previous run's data
         b_particles.clear();
-        for (int i = 0; i < NUMofParticle; i++) {
-          a_particles.push_back(i); //reset a particle
-          particlelocation[i] = 0; // reset particle locations. all particles are at location 0
+        c_population = 0; 
+
+        // Initialize a particles
+        for (int i = 0; i < NUMofParticleA; i++)
+        {
+            a_particles.push_back(i); 
+            particlelocation_a[i] = -L / 2; // a particles start at -L/2
         }
-        nstep = 0; // reset number of jumping steps
-        double timeTracker = 0.0; // reset time
-        bool exitflag = false; // reset exitflag
+
+        // Initialize b particles
+        for (int i = 0; i < NUMofParticleB; i++)
+        {
+            b_particles.push_back(i); 
+            particlelocation_b[i] = L / 2; // b particles start at L/2
+        }
+
+        nstep = 0; 
+        double timeTracker = 0.0; 
+        bool exitflag = false; 
         cout << "Initial population of a particles: " << a_particles.size() << endl;
         cout << "Initial population of b particles: " << b_particles.size() << endl;
-        while (!exitflag && !a_particles.empty()) {
-
-            a0 = (d + r)*a_particles.size(); //the total jumping and reacting propensity
-
+        cout << "Initial population of c particles: " << c_population << endl;
+    
+        while (!exitflag && (!a_particles.empty() || !b_particles.empty()))
+        {   // total propensity = diffusion propensity + reaction propensity
+            //a0 = (d * (a_particles.size() + b_particles.size())) + (a_particles.size() * b_particles.size()); 
+            a0 = (d+r)*(a_particles.size() + b_particles.size());
+            //printf("a0 is %f\n",a0);
             tau = reactiontime(a0);
             timeTracker += tau;
             nstep++;
 
             r2 = 1.0 * rand() / RAND_MAX;
             double r2a0 = r2 * a0;
+            // printf("r2*(d+r) is %f\n",r2 * a0);
+            // printf("d%f\n",d);
+            // printf("2d is %f\n",2*d);
+            if (r2*a0 <d)// a diffuse
+            {
+                int index = int(r2 * a_particles.size());
+                auto it = a_particles.begin();
+                advance(it, index);
 
-            int index = int(r2* a_particles.size());//select the index for the particle that will jump or react
-            auto it = a_particles.begin();//initialize iterator at the begining of the a_particles list 
-            advance(it, index); // Move iterator point to the selected index
-   
-            if (r2a0 < d) { // Diffusion event
-                r2residual = r2 * a_particles.size() - index; // decide left or right jump
+                r2residual = r2 * a_particles.size() - index;
                 if (r2residual > 0.5)
                     jumpdirection = 1;
                 else
                     jumpdirection = -1;
-               
-                particlelocation[*it] += jumpdirection;
-                if (particlelocation[*it] == BINNUM * jumpdirection) {
-                    a_particles.erase(it); // Remove particle from a_particles list
-                }
-            } else { // Reaction event
-               
-              a_particles.erase(it);// Remove particle from a_particles list
-              b_particles.push_back(*it); //Add particle to b_particles list
-            } 
 
-            if (a_particles.empty()) {
+                particlelocation_a[*it] += jumpdirection;
+               
+            }
+            else if (r2 * a0 >= d && r2 * a0 < 2 * d)// b diffuse
+            {
+                int index = int(r2 * b_particles.size());
+                auto it = b_particles.begin();
+                advance(it, index);
+
+                r2residual = r2 * b_particles.size() - index;
+                if (r2residual > 0.5)
+                    jumpdirection = 1;
+                else
+                    jumpdirection = -1;
+
+                particlelocation_b[*it] += jumpdirection;
+             
+            }
+            else  //reaction: a + b -> c
+            {  
+                int a_index = int(r2 * a_particles.size());
+                auto a_it = a_particles.begin();
+                advance(a_it, a_index);
+
+                int b_index = int(r2 * b_particles.size());
+                auto b_it = b_particles.begin();
+                advance(b_it, b_index);
+
+                reactiontimefile << timeTracker << endl;
+                total_reaction_time += timeTracker;
+
+                reaction_count++;
+                a_particles.erase(a_it);
+                b_particles.erase(b_it);
+                c_population++; // Increment c population
+            }
+
+            if (a_particles.empty() && b_particles.empty())
+            {
                 exitflag = true;
                 exittime[real] = timeTracker;
                 exittimefile << timeTracker << endl;
                 exitstepfile << nstep << endl;
             }
         }
-  }
 
-  double sum = 0;
-  for (i = 0; i < NUMofRUNS; i++)
-    sum += exittime[i];
-  double mean = sum / NUMofRUNS;
-  cout << "average exiting time = " << sum / NUMofRUNS << endl;
+    }
 
-  double variance = 0;
-  for (i = 0; i < NUMofRUNS; i++)
-    variance += (exittime[i] - mean) * (exittime[i] - mean);
-  variance /= NUMofRUNS;
-  //cout << "Variance of exiting time = " << variance << endl;
-  cout << "end of simulation ..." << endl;
-  cout << "final population of a particles: " << a_particles.size()   << endl;
-  cout << "final population of b particles: " << b_particles.size()   << endl;
-   
+    double sum = 0;
+    for (i = 0; i < NUMofRUNS; i++)
+        sum += exittime[i];
+    double mean = sum / NUMofRUNS;
+    cout << "final exiting time = " << sum / NUMofRUNS << endl;
+    
+    cout << "average reaction time " << total_reaction_time / reaction_count << endl;
+    double variance = 0;
+    for (i = 0; i < NUMofRUNS; i++)
+        variance += (exittime[i] - mean) * (exittime[i] - mean);
+    variance /= NUMofRUNS;
+
+
+    cout << "end of simulation ..." << endl;
+    cout << "final population of a particles: " << a_particles.size() << endl;
+    cout << "final population of b particles: " << b_particles.size() << endl;
+    cout << "final population of c particles: " << c_population << endl;
+    
 }
 
 double reactiontime(double a0)
 {
-  double r1, tau;
+    double r1, tau;
 
-  // reaction time follows exponential
-  // do {r1=1.0*rand()/RAND_MAX;} while(r1<=0 || r1>=1); //random number
-  // tau = -1.0/a0*log(r1);
+    // reaction time follows exponential
+    do
+    {
+        r1 = 1.0 * rand() / RAND_MAX;
+    } while (r1 <= 0 || r1 >= 1); // random number
+    tau = -1.0 / a0 * log(r1);
 
-  // fixed value
-  // double tau = 1/a0;
-
-  // uniform distribution
-  //   do {r1=1.0*rand()/RAND_MAX;} while(r1<=0 || r1>=1);
-  //   tau = 2/a0*r1;
-
-  // try normal distribution here
-  static std::default_random_engine generator;
-  static std::normal_distribution<double> distribution(1.0, 0.5); // mean = 1.0, stddev = 0.5
-  do
-  {
-    r1 = distribution(generator);
-  } while (r1 <= 0);
-  tau = r1 / a0; // mean = 1.0/a0, stddev = 0.5/a0
-
-  return tau;
+    return tau;
 }
