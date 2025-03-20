@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define DefaultBin 1 // This represents only one side of the total bin
+#define DefaultBin 1// This represents only one side of the total bin
 #define DefaultNumofRun 1
 #define DefaultNumofParticleA 1  // initial population of a particles
 #define DefaultNumofParticleB 1  // initial population of b particles
@@ -51,8 +51,8 @@ int main(int argc, char *argv[])
     list<int> a_particles;
     list<int> b_particles;
 
-    int particlelocation_a[NUMofParticleA];
-    int particlelocation_b[NUMofParticleB];
+    double particlelocation_a[NUMofParticleA];
+    double particlelocation_b[NUMofParticleB];
     int i, j, nstep;
 
     double reactiontime(double);
@@ -66,9 +66,9 @@ int main(int argc, char *argv[])
     double D = 1; // Diffusion rate
 
     double h = L / (BINNUM);    // interval length for the discretization
-    double d =  2* D / (h * h); // d is the jumping rate, including jumping to left or right
+    double d = 2* D / (h * h); // d is the jumping rate, including jumping to left or right
     
-    double r = 1/h;               // reaction rate
+    double r = 1;               // reaction rate
 
     //*****************************************
     // variables for SSA process
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     int reaction_count = 0;
     int jump_count = 0;
     int c_population = 0; // Population of c particles
-
+    int a_jump, b_jump;
     for (int real = 0; real < NUMofRUNS; real++)
     {
         a_particles.clear(); // Clear previous run's data
@@ -122,68 +122,75 @@ int main(int argc, char *argv[])
             particlelocation_b[i] = L / 2; // b particles start at L/2
         }
 
+
+    
         nstep = 0; 
         double timeTracker = 0.0; 
         bool exitflag = false; 
-        // cout << "Initial population of a particles: " << a_particles.size() << endl;
-        // cout << "Initial population of b particles: " << b_particles.size() << endl;
-        // cout << "Initial population of c particles: " << c_population << endl;
-     
+        cout << "Initial population of a particles: " << a_particles.size() << endl;
+        cout << "Initial population of b particles: " << b_particles.size() << endl;
+        cout << "Initial population of c particles: " << c_population << endl;
+    
         while (!exitflag && (!a_particles.empty() || !b_particles.empty()))
         {   // total propensity = diffusion propensity + reaction propensity
-            a0 = (d * (a_particles.size() + b_particles.size())) + (r * a_particles.size() * b_particles.size()); 
-
+            a0 = 2*d*(a_particles.size() + b_particles.size())+r*(a_particles.size() + b_particles.size());
             tau = reactiontime(a0);
+          
             timeTracker += tau;
             nstep++;
 
             r2 = 1.0 * rand() / RAND_MAX;
             double r2a0 = r2 * a0;
-
-            if (r2a0 < d * a_particles.size())// a diffuse
-            {
-                printf("a diffuse\n");
+           
+            if (r2*a0 <d*(a_particles.size() + b_particles.size()))// a diffuse
+            {   
+                a_jump +=1; //Count a jump 
                 int index = int(r2 * a_particles.size());
                 auto it = a_particles.begin();
                 advance(it, index);
-
+             
                 r2residual = r2 * a_particles.size() - index;
+            
                 if (r2residual > 0.5)
                     jumpdirection = 1;
                 else
                     jumpdirection = -1;
-
-                particlelocation_a[*it] += jumpdirection;
-                if (particlelocation_a[*it] == BINNUM * jumpdirection)
-                {
-                    jumptimesfile << timeTracker << endl; 
-                    total_jump_time += timeTracker;
-                    //a_particles.erase(it);
+                //Reflective boundary. If particle jump out of boundary, jump backward instead
+                if (particlelocation_a[*it] + 1 >  L) { 
+                    particlelocation_a[*it] -= 1 ;  
+                } else if (particlelocation_a[*it] -1 < -L) {
+                    particlelocation_a[*it] +=1;   
+                } else {
+                    particlelocation_a[*it] += jumpdirection;
                 }
+                     
+            
             }
-            else if (r2a0 < d * (a_particles.size() + b_particles.size()))// b diffuse
+            else if (r2 * a0 >= d*(a_particles.size() + b_particles.size()) && r2 * a0 < 2*d*(a_particles.size() + b_particles.size()))// b diffuse
             {
-                printf("b diffuse\n");
+                b_jump+=1;
                 int index = int(r2 * b_particles.size());
                 auto it = b_particles.begin();
                 advance(it, index);
-
                 r2residual = r2 * b_particles.size() - index;
+            
                 if (r2residual > 0.5)
                     jumpdirection = 1;
                 else
                     jumpdirection = -1;
-
-                particlelocation_b[*it] += jumpdirection;
-                if (particlelocation_b[*it] == BINNUM * jumpdirection)
-                {
-                    jumptimesfile << timeTracker << endl; // Record jump time
-                    total_jump_time += timeTracker;
-                    //b_particles.erase(it);
+                
+                //Reflective boundary. If particle jump out of boundary, jump backward instead
+                if (particlelocation_b[*it] + 1 >  L) {
+                    particlelocation_b[*it] -= 1 ;  
+                } else if (particlelocation_b[*it] -1 < -L) {
+                    particlelocation_b[*it] +=1;   
+                } else {
+                    particlelocation_b[*it] += jumpdirection;
                 }
+  
             }
-            else //reaction: a + b -> c
-            {   printf("react\n");
+            else  //reaction: a + b -> c
+            {  
                 int a_index = int(r2 * a_particles.size());
                 auto a_it = a_particles.begin();
                 advance(a_it, a_index);
@@ -191,13 +198,21 @@ int main(int argc, char *argv[])
                 int b_index = int(r2 * b_particles.size());
                 auto b_it = b_particles.begin();
                 advance(b_it, b_index);
-                //printf("reaction\n");
-                reactiontimefile << timeTracker << endl;
-                total_reaction_time += timeTracker;
-                reaction_count++;
-                a_particles.erase(a_it);
-                b_particles.erase(b_it);
-                c_population++; // Increment c population
+
+                //Check if a and b in the same location
+                if (particlelocation_a[*a_it] == particlelocation_b[*b_it]) {  
+                    reactiontimefile << timeTracker << endl;
+                    total_reaction_time += timeTracker;
+                    reaction_count++;
+            
+                    a_particles.erase(a_it);
+                    b_particles.erase(b_it);
+                    c_population++; // Increment c population
+                } else {
+                    printf("No reaction: a in bin %f, b in bin %f\n", particlelocation_a[*a_it], particlelocation_b[*b_it]);
+                  
+                }
+             
             }
 
             if (a_particles.empty() && b_particles.empty())
@@ -211,19 +226,20 @@ int main(int argc, char *argv[])
 
     }
 
-    double sum = 0;
-    for (i = 0; i < NUMofRUNS; i++)
-        sum += exittime[i];
-    double mean = sum / NUMofRUNS;
-    cout << "final exiting time = " << sum / NUMofRUNS << endl;
+    // double sum = 0;
+    // for (i = 0; i < NUMofRUNS; i++)
+    //     sum += exittime[i];
+    // double mean = sum / NUMofRUNS;
+    // cout << "final exiting time = " << sum / NUMofRUNS << endl;
     
     cout << "average reaction time " << total_reaction_time / reaction_count << endl;
-    double variance = 0;
-    for (i = 0; i < NUMofRUNS; i++)
-        variance += (exittime[i] - mean) * (exittime[i] - mean);
-    variance /= NUMofRUNS;
+    // double variance = 0;
+    // for (i = 0; i < NUMofRUNS; i++)
+    //     variance += (exittime[i] - mean) * (exittime[i] - mean);
+    // variance /= NUMofRUNS;
 
-
+    printf("Number of jumps of A before reaction fire %d\n",a_jump);
+    printf("Number of jumps of B before reaction fire %d\n",b_jump);
     cout << "end of simulation ..." << endl;
     cout << "final population of a particles: " << a_particles.size() << endl;
     cout << "final population of b particles: " << b_particles.size() << endl;
