@@ -10,8 +10,8 @@
 
 using namespace std;
 
-#define DefaultBin 1// This represents only one side of the total bin
-#define DefaultNumofRun 1
+//#define DefaultBin 10// This represents only one side of the total bin
+#define DefaultNumofRun 100
 #define DefaultNumofParticleA 1  // initial population of a particles
 #define DefaultNumofParticleB 1  // initial population of b particles
 // #define printtraj
@@ -19,13 +19,14 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-    int BINNUM, NUMofRUNS, NUMofParticleA, NUMofParticleB;
-    if (argc > 1)
-        BINNUM = atoi(argv[1]);
-    else
-        BINNUM = DefaultBin;
-    if (BINNUM == 0)
-        BINNUM = DefaultBin;
+    int NUMofRUNS, NUMofParticleA, NUMofParticleB;
+    double BINNUM=1; // Bin number
+    // if (argc > 1)
+    //     BINNUM = atoi(argv[1]);
+    // else
+    //     BINNUM = DefaultBin;
+    // if (BINNUM == 0)                   
+    //     BINNUM = DefaultBin;
 
     if (argc > 2)
         NUMofRUNS = atoi(argv[2]);
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     ////////////////////////////////////////////////////
 
     double L = 1; // 1D interval length (half)
-
+    
     double D = 1; // Diffusion rate
 
     double h = L / (BINNUM);    // interval length for the discretization
@@ -94,7 +95,8 @@ int main(int argc, char *argv[])
     cout << "jumping rate = " << d << endl;
     cout << "reacting rate = " << r << endl;
     cout << "total iterations " << NUMofRUNS << endl;
-
+    // NEW FILE to store times when a- and b-particles meet but do not react
+    ofstream meetfile("meet_times.txt", ios::out);
     double exittime[NUMofRUNS];
     double total_reaction_time = 0.0;
     double total_jump_time = 0.0;
@@ -112,14 +114,16 @@ int main(int argc, char *argv[])
         for (int i = 0; i < NUMofParticleA; i++)
         {
             a_particles.push_back(i); 
-            particlelocation_a[i] = -L / 2; // a particles start at -L/2
+            particlelocation_a[i] = -BINNUM / 2; // a particles start at -BINNUM/2
+            printf("particlelocation_a[i] is %f\n",particlelocation_a[i]);
         }
 
         // Initialize b particles
         for (int i = 0; i < NUMofParticleB; i++)
         {
             b_particles.push_back(i); 
-            particlelocation_b[i] = L / 2; // b particles start at L/2
+            particlelocation_b[i] = BINNUM / 2; // b particles start at BINNUM/2
+            printf("particlelocation_b[i] is %f\n",particlelocation_b[i]);
         }
 
 
@@ -156,13 +160,22 @@ int main(int argc, char *argv[])
                 else
                     jumpdirection = -1;
                 //Reflective boundary. If particle jump out of boundary, jump backward instead
-                if (particlelocation_a[*it] + 1 >  L) { 
+                if (particlelocation_a[*it] + 1 >  BINNUM) { 
                     particlelocation_a[*it] -= 1 ;  
-                } else if (particlelocation_a[*it] -1 < -L) {
+                } else if (particlelocation_a[*it] -1 < -BINNUM) {
                     particlelocation_a[*it] +=1;   
                 } else {
                     particlelocation_a[*it] += jumpdirection;
                 }
+                 // AFTER diffusing a, check if it meets any b but does NOT react
+                for (auto b_idx : b_particles)
+                {
+                    if (particlelocation_a[*it] == particlelocation_b[b_idx])
+                    {
+                        // They have the same location but no reaction, because we performed diffusion
+                        meetfile << timeTracker << endl;
+                    }
+                 }
                      
             
             }
@@ -180,14 +193,22 @@ int main(int argc, char *argv[])
                     jumpdirection = -1;
                 
                 //Reflective boundary. If particle jump out of boundary, jump backward instead
-                if (particlelocation_b[*it] + 1 >  L) {
+                if (particlelocation_b[*it] + 1 >  BINNUM) {
                     particlelocation_b[*it] -= 1 ;  
-                } else if (particlelocation_b[*it] -1 < -L) {
+                } else if (particlelocation_b[*it] -1 < -BINNUM) {
                     particlelocation_b[*it] +=1;   
                 } else {
                     particlelocation_b[*it] += jumpdirection;
                 }
-  
+                  // AFTER diffusing b, check if it meets any a but does NOT react
+                  for (auto a_idx : a_particles)
+                  {
+                      if (particlelocation_b[*it] == particlelocation_a[a_idx])
+                      {
+                          // They have the same location but no reaction, because we performed diffusion
+                          meetfile << timeTracker << endl;
+                      }
+                  }
             }
             else  //reaction: a + b -> c
             {  
@@ -198,17 +219,18 @@ int main(int argc, char *argv[])
                 int b_index = int(r2 * b_particles.size());
                 auto b_it = b_particles.begin();
                 advance(b_it, b_index);
-
+                
                 //Check if a and b in the same location
                 if (particlelocation_a[*a_it] == particlelocation_b[*b_it]) {  
                     reactiontimefile << timeTracker << endl;
                     total_reaction_time += timeTracker;
                     reaction_count++;
-            
+        
                     a_particles.erase(a_it);
                     b_particles.erase(b_it);
                     c_population++; // Increment c population
                 } else {
+                    
                     printf("No reaction: a in bin %f, b in bin %f\n", particlelocation_a[*a_it], particlelocation_b[*b_it]);
                   
                 }
